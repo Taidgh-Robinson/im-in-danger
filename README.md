@@ -28,6 +28,11 @@ The loop stops when the agent puts `<promise>COMPLETE</promise>` on a line by it
 agent command fails, or when the iteration limit is reached. Reaching the limit returns exit code
 2; an agent failure returns 1.
 
+If the work item lists `verification` commands, the harness runs them itself after every iteration
+instead of trusting the agent's report. The completion marker is only accepted when every command
+exits 0. When a command fails, the tail of its output is added to the next iteration's prompt so
+the fresh session starts from the real failure.
+
 ## Safety model
 
 The defaults are intentionally conservative:
@@ -36,6 +41,10 @@ The defaults are intentionally conservative:
 - OpenCode uses its configured permission policy.
 - Neither backend receives an automatic-approval flag unless you pass `--auto-approve`.
 - Every run must have a positive `--max-iterations` value.
+- `verification` commands run through your shell in the repository root, outside the agent's
+  sandbox, because they come from your work item. They are read once at startup, so an agent
+  editing `WORK_ITEM.toml` mid-run cannot change what the harness executes. They do run code the
+  agent wrote (your tests), just as running the tests yourself would.
 
 `--auto-approve` maps to `codex exec --approve-for-me` and `opencode run --auto`. OpenCode labels
 its flag dangerous, so use it only inside a repository you trust and review your agent/tool

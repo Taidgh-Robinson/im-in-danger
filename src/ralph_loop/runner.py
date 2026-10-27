@@ -5,12 +5,13 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from ralph_loop.agents import AgentAdapter
+from ralph_loop.verification import VerificationResult, run_verification
 from ralph_loop.work_items import WorkItem
 
 DEFAULT_COMPLETION_MARKER = "<promise>COMPLETE</promise>"
@@ -41,10 +42,26 @@ class LoopResult:
     failed: bool = False
 
 
-def compose_prompt(work_item: WorkItem, iteration: int, marker: str) -> str:
+def compose_prompt(
+    work_item: WorkItem,
+    iteration: int,
+    marker: str,
+    *,
+    verification_feedback: str | None = None,
+) -> str:
     """Add the repeatable loop contract to the user's task."""
-    return f"""{work_item.as_prompt()}
+    feedback = ""
+    if verification_feedback:
+        feedback = f"""
+## Verification feedback
 
+The harness ran the verification commands after the previous iteration and they failed. Fix these
+failures before starting anything else:
+
+{verification_feedback}
+"""
+    return f"""{work_item.as_prompt()}
+{feedback}
 ## RALPH iteration contract
 
 This is iteration {iteration}. Work on the task now: inspect the repository, make the most useful
@@ -59,7 +76,9 @@ by itself in your final response:
 
 {marker}
 
-Do not emit the marker when work remains or verification is failing.
+Do not emit the marker when work remains or verification is failing. When the work item lists
+verification commands, the harness runs them after every iteration and ignores the marker unless
+they all pass.
 """
 
 
@@ -97,10 +116,21 @@ def _run_command(
         return process.wait()
 
 
+def _report_verification(verification: VerificationResult) -> None:
+    """Print a one-line status for each verification command."""
+    print("\n--- Verification ---")
+    for result in verification.results:
+        status = "PASS" if result.passed else f"FAIL (exit {result.return_code})"
+        print(f"{status}: {result.command}")
+    if not verification.passed:
+        print(verification.feedback(), file=sys.stderr)
+
+
 def run_loop(
     config: LoopConfig,
     *,
     invoke: Callable[[list[str], str | None, Path, Path], int] = _run_command,
+    verify: Callable[[Sequence[str], Path], VerificationResult] = run_verification,
 ) -> LoopResult:
     """Run fresh agent sessions until completion, failure, or the configured bound."""
     if config.max_iterations < 1:
@@ -116,10 +146,16 @@ def run_loop(
             "# RALPH progress\n\nNo iterations completed yet.\n", encoding="utf-8"
         )
 
+    feedback: str | None = None
     for iteration in range(1, config.max_iterations + 1):
         log = run_dir / f"iteration-{iteration}.log"
         final_message = run_dir / f"iteration-{iteration}.final.txt"
-        prompt = compose_prompt(config.work_item, iteration, config.completion_marker)
+        prompt = compose_prompt(
+            config.work_item,
+            iteration,
+            config.completion_marker,
+            verification_feedback=feedback,
+        )
         command = config.adapter.command(
             executable=config.executable,
             root=config.root,
@@ -147,7 +183,20 @@ def run_loop(
             )
 
         output = config.adapter.completion_output(log=log, final_message=final_message)
-        if has_completion_marker(output, config.completion_marker):
+        claimed = has_completion_marker(output, config.completion_marker)
+        if config.work_item.verification:
+            verification = verify(config.work_item.verification, config.root)
+            _report_verification(verification)
+            if not verification.passed:
+                feedback = verification.feedback()
+                if claimed:
+                    print(
+                        "Ignoring the completion marker because verification failed.",
+                        file=sys.stderr,
+                    )
+                continue
+            feedback = None
+        if claimed:
             return LoopResult(completed=True, iterations=iteration, run_dir=run_dir)
 
     return LoopResult(
