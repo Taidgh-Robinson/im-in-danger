@@ -5,7 +5,12 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from ralph_loop.agents import OpenCodeAdapter
-from ralph_loop.runner import LoopConfig, has_completion_marker, run_loop
+from ralph_loop.runner import (
+    LoopConfig,
+    compose_prompt,
+    has_completion_marker,
+    run_loop,
+)
 from ralph_loop.verification import CommandResult, VerificationResult
 from ralph_loop.work_items import WorkItem
 
@@ -190,3 +195,12 @@ class LoopTests(TestCase):
             self.assertFalse(result.completed)
             self.assertFalse(result.failed)
             self.assertEqual(result.iterations, 2)
+
+
+class ComposePromptTests(TestCase):
+    def test_completion_requires_definition_of_done_and_acceptance(self) -> None:
+        prompt = compose_prompt(WORK_ITEM, 1, "<promise>COMPLETE</promise>")
+
+        self.assertIn(
+            "every definition of done item and every acceptance criterion", prompt
+        )

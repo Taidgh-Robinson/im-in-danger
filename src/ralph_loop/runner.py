@@ -71,8 +71,8 @@ Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it
 the end of this iteration, update it with completed work, verification results, important
 decisions, and the clearest next step.
 
-Only when every acceptance criterion is genuinely satisfied, include this exact marker on a line
-by itself in your final response:
+Only when every definition of done item and every acceptance criterion is genuinely satisfied,
+include this exact marker on a line by itself in your final response:
 
 {marker}
 
