@@ -87,6 +87,26 @@ change. Keep each criterion independently verifiable, and do not include the com
 The prompt labels them `DoD-1`, `DoD-2`, … and `AC-1`, `AC-2`, … in file order, and the agent
 reports status against those IDs.
 
+## Customizing the iteration contract
+
+The harness appends an iteration contract to every prompt. The default lives in
+`src/ralph_loop/contract.md`. To try different wording without editing code, copy that file,
+change it, and pass it with `--contract`:
+
+```bash
+uv run ralph --agent codex --work-item WORK_ITEM.toml --contract my-contract.md --dry-run
+```
+
+The template uses Python `string.Template` placeholders:
+
+- `$marker` (required): the completion marker the harness looks for.
+- `$iteration` and `$max_iterations`: the current iteration and the limit.
+- `$final_iteration_note`: the wrap-up instructions on the last iteration, empty otherwise.
+- `$verification_feedback`: failing verification output from the previous iteration, empty
+  otherwise.
+
+Unknown placeholders are rejected at startup. Write a literal `$` as `$$`.
+
 Start with two or three iterations and inspect `.ralph/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
 

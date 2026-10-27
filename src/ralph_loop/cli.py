@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 from ralph_loop.agents import ADAPTERS, get_adapter
+from ralph_loop.contract import default_contract, load_contract
 from ralph_loop.runner import LoopConfig, compose_prompt, run_loop
 from ralph_loop.work_items import load_work_item
 
@@ -23,6 +24,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("WORK_ITEM.toml"),
         help="Path to a structured TOML work item (default: WORK_ITEM.toml)",
+    )
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        help="Path to a custom iteration contract template (default: the built-in one)",
     )
     parser.add_argument("--max-iterations", type=int, default=5)
     parser.add_argument("--model", help="Backend-specific model name")
@@ -58,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     adapter = get_adapter(args.agent)
     try:
         work_item = load_work_item(work_item_path)
+        contract = load_contract(args.contract) if args.contract else default_contract()
     except ValueError as error:
         raise SystemExit(str(error)) from error
 
@@ -67,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
             1,
             "<promise>COMPLETE</promise>",
             max_iterations=args.max_iterations,
+            contract=contract,
         )
         preview_final = root / ".ralph" / "runs" / "DRY-RUN" / "iteration-1.final.txt"
         command = adapter.command(
@@ -88,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         LoopConfig(
             root=root,
             work_item=work_item,
+            contract=contract,
             adapter=adapter,
             executable=resolved,
             max_iterations=args.max_iterations,

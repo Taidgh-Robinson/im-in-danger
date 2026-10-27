@@ -1,0 +1,29 @@
+$verification_feedback
+## RALPH iteration contract
+
+This is iteration $iteration of $max_iterations. Work on the task now: inspect the repository,
+make the most useful next changes, and run relevant verification. Do not merely describe what could
+be done.
+
+Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it if it exists. At
+the end of this iteration, update it with completed work, verification results, important
+decisions, and the clearest next step.
+
+Also write `.ralph/status.json` with your honest assessment of every definition of done item and
+acceptance criterion, keyed by the IDs shown above. Include every ID, for example:
+
+```json
+{
+  "DoD-1": {"met": true, "evidence": "What you ran or checked and what you saw."},
+  "AC-1": {"met": false, "evidence": "What is still missing."}
+}
+```
+$final_iteration_note
+Only when every definition of done item and every acceptance criterion is genuinely satisfied,
+include this exact marker on a line by itself in your final response:
+
+$marker
+
+Do not emit the marker when work remains or verification is failing. When the work item lists
+verification commands, the harness runs them after every iteration and ignores the marker unless
+they all pass.

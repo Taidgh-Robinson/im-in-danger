@@ -6,11 +6,12 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
 from ralph_loop.agents import AgentAdapter
+from ralph_loop.contract import default_contract, render_contract
 from ralph_loop.status import STATUS_FILE, format_status, read_status
 from ralph_loop.verification import VerificationResult, run_verification
 from ralph_loop.work_items import WorkItem
@@ -31,6 +32,7 @@ class LoopConfig:
     model: str | None = None
     auto_approve: bool = False
     completion_marker: str = DEFAULT_COMPLETION_MARKER
+    contract: str = field(default_factory=default_contract)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +52,7 @@ def compose_prompt(
     *,
     max_iterations: int,
     verification_feedback: str | None = None,
+    contract: str | None = None,
 ) -> str:
     """Add the repeatable loop contract to the user's task."""
     final_note = ""
@@ -69,37 +72,15 @@ failures before starting anything else:
 
 {verification_feedback}
 """
-    return f"""{work_item.as_prompt()}
-{feedback}
-## RALPH iteration contract
-
-This is iteration {iteration} of {max_iterations}. Work on the task now: inspect the repository,
-make the most useful next changes, and run relevant verification. Do not merely describe what could
-be done.
-
-Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it if it exists. At
-the end of this iteration, update it with completed work, verification results, important
-decisions, and the clearest next step.
-
-Also write `.ralph/status.json` with your honest assessment of every definition of done item and
-acceptance criterion, keyed by the IDs shown above. Include every ID, for example:
-
-```json
-{{
-  "DoD-1": {{"met": true, "evidence": "What you ran or checked and what you saw."}},
-  "AC-1": {{"met": false, "evidence": "What is still missing."}}
-}}
-```
-{final_note}
-Only when every definition of done item and every acceptance criterion is genuinely satisfied,
-include this exact marker on a line by itself in your final response:
-
-{marker}
-
-Do not emit the marker when work remains or verification is failing. When the work item lists
-verification commands, the harness runs them after every iteration and ignores the marker unless
-they all pass.
-"""
+    rendered = render_contract(
+        contract if contract is not None else default_contract(),
+        iteration=iteration,
+        max_iterations=max_iterations,
+        marker=marker,
+        final_iteration_note=final_note,
+        verification_feedback=feedback,
+    )
+    return f"{work_item.as_prompt()}\n{rendered}"
 
 
 def has_completion_marker(text: str, marker: str = DEFAULT_COMPLETION_MARKER) -> bool:
@@ -198,6 +179,7 @@ def run_loop(
             config.completion_marker,
             max_iterations=config.max_iterations,
             verification_feedback=feedback,
+            contract=config.contract,
         )
         command = config.adapter.command(
             executable=config.executable,
