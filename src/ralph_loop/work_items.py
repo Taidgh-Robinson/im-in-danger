@@ -17,6 +17,8 @@ class WorkItem:
     acceptance_criteria: tuple[str, ...]
     constraints: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
+    relevant_paths: tuple[str, ...] = ()
+    non_goals: tuple[str, ...] = ()
 
     def checklist(self) -> tuple[tuple[str, str], ...]:
         """Return stable IDs for every definition of done item and acceptance criterion."""
@@ -29,6 +31,12 @@ class WorkItem:
         sections = [
             f"# Work item: {self.title}",
             f"## Description\n\n{self.description}",
+        ]
+        if self.relevant_paths:
+            sections.append(
+                _render_list("Relevant paths", self.relevant_paths, code=True)
+            )
+        sections += [
             _render_list(
                 "Definition of done",
                 tuple(_labelled(_numbered("DoD", self.definition_of_done))),
@@ -40,6 +48,8 @@ class WorkItem:
         ]
         if self.constraints:
             sections.append(_render_list("Constraints", self.constraints))
+        if self.non_goals:
+            sections.append(_render_list("Non-goals", self.non_goals))
         if self.verification:
             sections.append(_render_list("Verification", self.verification, code=True))
         return "\n\n".join(sections)
@@ -99,4 +109,6 @@ def load_work_item(path: Path) -> WorkItem:
         ),
         constraints=_string_list(data, "constraints", path, required=False),
         verification=_string_list(data, "verification", path, required=False),
+        relevant_paths=_string_list(data, "relevant_paths", path, required=False),
+        non_goals=_string_list(data, "non_goals", path, required=False),
     )

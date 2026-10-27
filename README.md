@@ -69,9 +69,17 @@ uv run ralph --agent opencode --model provider/model --work-item WORK_ITEM.toml
 ## Writing a useful work item
 
 Describe the work in `WORK_ITEM.toml` using the required `title`, `description`,
-`definition_of_done`, and `acceptance_criteria` fields. Optional `constraints` and `verification`
-arrays provide implementation boundaries and useful commands. The harness validates the work item,
-renders it into a consistent prompt, and adds the iteration and completion contract automatically.
+`definition_of_done`, and `acceptance_criteria` fields. These optional arrays shape the work
+further:
+
+- `relevant_paths`: files and directories to start from, so each fresh session spends less time
+  exploring.
+- `constraints`: implementation boundaries.
+- `non_goals`: nearby work the agent should leave alone.
+- `verification`: commands the harness runs after every iteration.
+
+The harness validates the work item, renders it into a consistent prompt, and adds the iteration
+and completion contract automatically.
 
 Definition of done describes the quality bar shared by the whole item, such as passing tests and
 updated documentation. Acceptance criteria describe observable behavior specific to the requested

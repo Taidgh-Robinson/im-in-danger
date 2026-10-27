@@ -17,6 +17,8 @@ definition_of_done = ["Tests pass."]
 acceptance_criteria = ["The output is valid JSON."]
 constraints = ["Use the standard library."]
 verification = ["python -m unittest"]
+relevant_paths = ["src/export.py"]
+non_goals = ["Do not add CSV export."]
 """,
                 encoding="utf-8",
             )
@@ -30,6 +32,11 @@ verification = ["python -m unittest"]
                 "## Acceptance criteria\n\n- AC-1: The output is valid JSON.", prompt
             )
             self.assertIn("- `python -m unittest`", prompt)
+            self.assertIn("## Relevant paths\n\n- `src/export.py`", prompt)
+            self.assertIn("## Non-goals\n\n- Do not add CSV export.", prompt)
+            self.assertLess(
+                prompt.index("## Relevant paths"), prompt.index("## Definition of done")
+            )
 
     def test_rejects_missing_required_fields(self) -> None:
         with TemporaryDirectory() as directory:
@@ -65,7 +72,9 @@ acceptance_criteria = []
 
         prompt = work_item.as_prompt()
 
+        self.assertNotIn("## Relevant paths", prompt)
         self.assertNotIn("## Constraints", prompt)
+        self.assertNotIn("## Non-goals", prompt)
         self.assertNotIn("## Verification", prompt)
 
     def test_optional_sections_may_be_empty_arrays(self) -> None:
@@ -79,6 +88,8 @@ definition_of_done = ["Tests pass."]
 acceptance_criteria = ["Behavior is observable."]
 constraints = []
 verification = []
+relevant_paths = []
+non_goals = []
 """,
                 encoding="utf-8",
             )
@@ -87,6 +98,8 @@ verification = []
 
             self.assertEqual(work_item.constraints, ())
             self.assertEqual(work_item.verification, ())
+            self.assertEqual(work_item.relevant_paths, ())
+            self.assertEqual(work_item.non_goals, ())
 
     def test_checklist_assigns_stable_ids(self) -> None:
         work_item = WorkItem(

@@ -5,6 +5,10 @@ Describe the work to be done, why it is needed, and any context the agent needs 
 implementation decisions.
 """
 
+relevant_paths = [
+  "src/",
+]
+
 definition_of_done = [
   "The implementation is complete rather than a partial scaffold.",
   "Relevant automated tests pass.",
@@ -19,6 +23,10 @@ acceptance_criteria = [
 constraints = [
   "Keep changes focused on this repository.",
   "Prefer the simplest maintainable implementation.",
+]
+
+non_goals = [
+  "Name nearby work the agent should leave alone.",
 ]
 
 verification = [
