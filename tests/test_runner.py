@@ -21,6 +21,7 @@ WORK_ITEM = WorkItem(
     acceptance_criteria=("The thing works.",),
 )
 VERIFIED_WORK_ITEM = replace(WORK_ITEM, verification=("make test",))
+MARKER = "<promise>COMPLETE</promise>"
 
 
 class CompletionMarkerTests(TestCase):
@@ -199,8 +200,21 @@ class LoopTests(TestCase):
 
 class ComposePromptTests(TestCase):
     def test_completion_requires_definition_of_done_and_acceptance(self) -> None:
-        prompt = compose_prompt(WORK_ITEM, 1, "<promise>COMPLETE</promise>")
+        prompt = compose_prompt(WORK_ITEM, 1, MARKER, max_iterations=3)
 
         self.assertIn(
             "every definition of done item and every acceptance criterion", prompt
         )
+
+    def test_prompt_states_the_iteration_budget(self) -> None:
+        prompt = compose_prompt(WORK_ITEM, 2, MARKER, max_iterations=5)
+
+        self.assertIn("This is iteration 2 of 5.", prompt)
+        self.assertNotIn("This is the final iteration.", prompt)
+
+    def test_final_iteration_asks_for_a_clean_handoff(self) -> None:
+        prompt = compose_prompt(WORK_ITEM, 5, MARKER, max_iterations=5)
+
+        self.assertIn("This is iteration 5 of 5.", prompt)
+        self.assertIn("This is the final iteration.", prompt)
+        self.assertIn("Do not start large new pieces of work.", prompt)

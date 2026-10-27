@@ -47,9 +47,17 @@ def compose_prompt(
     iteration: int,
     marker: str,
     *,
+    max_iterations: int,
     verification_feedback: str | None = None,
 ) -> str:
     """Add the repeatable loop contract to the user's task."""
+    final_note = ""
+    if iteration == max_iterations:
+        final_note = """
+This is the final iteration. Do not start large new pieces of work. Finish or safely wrap up what
+is in progress, leave the repository in a working state, and make `.ralph/progress.md` a clear
+handoff for whoever picks this up next.
+"""
     feedback = ""
     if verification_feedback:
         feedback = f"""
@@ -64,13 +72,14 @@ failures before starting anything else:
 {feedback}
 ## RALPH iteration contract
 
-This is iteration {iteration}. Work on the task now: inspect the repository, make the most useful
-next changes, and run relevant verification. Do not merely describe what could be done.
+This is iteration {iteration} of {max_iterations}. Work on the task now: inspect the repository,
+make the most useful next changes, and run relevant verification. Do not merely describe what could
+be done.
 
 Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it if it exists. At
 the end of this iteration, update it with completed work, verification results, important
 decisions, and the clearest next step.
-
+{final_note}
 Only when every definition of done item and every acceptance criterion is genuinely satisfied,
 include this exact marker on a line by itself in your final response:
 
@@ -154,6 +163,7 @@ def run_loop(
             config.work_item,
             iteration,
             config.completion_marker,
+            max_iterations=config.max_iterations,
             verification_feedback=feedback,
         )
         command = config.adapter.command(

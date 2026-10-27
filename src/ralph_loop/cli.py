@@ -62,6 +62,12 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(str(error)) from error
 
     if args.dry_run:
+        prompt = compose_prompt(
+            work_item,
+            1,
+            "<promise>COMPLETE</promise>",
+            max_iterations=args.max_iterations,
+        )
         preview_final = root / ".ralph" / "runs" / "DRY-RUN" / "iteration-1.final.txt"
         command = adapter.command(
             executable=resolved,
@@ -69,13 +75,13 @@ def main(argv: list[str] | None = None) -> int:
             final_message=preview_final,
             model=args.model,
             auto_approve=args.auto_approve,
-            prompt=compose_prompt(work_item, 1, "<promise>COMPLETE</promise>"),
+            prompt=prompt,
         )
         print("Command:")
         display_command = command if adapter.uses_stdin else [*command[:-1], "<PROMPT>"]
         print(shlex.join(display_command))
         print("\nPrompt:\n")
-        print(compose_prompt(work_item, 1, "<promise>COMPLETE</promise>"))
+        print(prompt)
         return 0
 
     result = run_loop(
