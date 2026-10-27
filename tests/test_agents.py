@@ -47,4 +47,3 @@ class AgentAdapterTests(TestCase):
             self.assertEqual(
                 CodexAdapter().completion_output(log=log, final_message=final), "final"
             )
-

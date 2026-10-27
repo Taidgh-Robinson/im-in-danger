@@ -10,8 +10,11 @@ from typing import Protocol
 class AgentAdapter(Protocol):
     """The small interface needed by the backend-neutral loop."""
 
-    name: str
-    uses_stdin: bool
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def uses_stdin(self) -> bool: ...
 
     def command(
         self,
@@ -27,8 +30,10 @@ class AgentAdapter(Protocol):
     def completion_output(self, *, log: Path, final_message: Path) -> str: ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CodexAdapter:
+    """Build Codex commands and read their final response."""
+
     name: str = "codex"
     uses_stdin: bool = True
 
@@ -68,8 +73,10 @@ class CodexAdapter:
         return log.read_text(encoding="utf-8")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OpenCodeAdapter:
+    """Build OpenCode commands and read their combined output."""
+
     name: str = "opencode"
     uses_stdin: bool = False
 
@@ -106,4 +113,3 @@ ADAPTERS: dict[str, AgentAdapter] = {
 def get_adapter(name: str) -> AgentAdapter:
     """Return a named adapter."""
     return ADAPTERS[name]
-

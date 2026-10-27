@@ -16,3 +16,17 @@ build-backend = "uv_build"
 [tool.uv]
 package = true
 
+[dependency-groups]
+dev = [
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "TID", "UP"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+

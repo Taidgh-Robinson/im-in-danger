@@ -7,8 +7,9 @@ import shlex
 import shutil
 from pathlib import Path
 
-from .agents import ADAPTERS, get_adapter
-from .runner import LoopConfig, compose_prompt, run_loop
+from ralph_loop.agents import ADAPTERS, get_adapter
+from ralph_loop.runner import LoopConfig, compose_prompt, run_loop
+from ralph_loop.work_items import load_work_item
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -17,7 +18,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run a bounded, fresh-session RALPH loop with Codex or OpenCode.",
     )
     parser.add_argument("--agent", choices=sorted(ADAPTERS), default="codex")
-    parser.add_argument("--prompt", type=Path, default=Path("PROMPT.md"))
+    parser.add_argument(
+        "--work-item",
+        type=Path,
+        default=Path("WORK_ITEM.toml"),
+        help="Path to a structured TOML work item (default: WORK_ITEM.toml)",
+    )
     parser.add_argument("--max-iterations", type=int, default=5)
     parser.add_argument("--model", help="Backend-specific model name")
     parser.add_argument("--executable", help="Override the selected agent executable")
@@ -26,19 +32,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow the backend to auto-approve tool permissions (review safety notes first)",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Print command and prompt, then exit")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print command and prompt, then exit"
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = Path.cwd().resolve()
-    prompt_path = args.prompt if args.prompt.is_absolute() else root / args.prompt
+    work_item_path = (
+        args.work_item if args.work_item.is_absolute() else root / args.work_item
+    )
 
     if args.max_iterations < 1:
         raise SystemExit("--max-iterations must be at least 1")
-    if not prompt_path.is_file():
-        raise SystemExit(f"Prompt file does not exist: {prompt_path}")
+    if not work_item_path.is_file():
+        raise SystemExit(f"Work item does not exist: {work_item_path}")
 
     executable = args.executable or args.agent
     resolved = shutil.which(executable)
@@ -46,7 +56,10 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"Agent executable not found: {executable}")
 
     adapter = get_adapter(args.agent)
-    task = prompt_path.read_text(encoding="utf-8")
+    try:
+        work_item = load_work_item(work_item_path)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
 
     if args.dry_run:
         preview_final = root / ".ralph" / "runs" / "DRY-RUN" / "iteration-1.final.txt"
@@ -56,19 +69,19 @@ def main(argv: list[str] | None = None) -> int:
             final_message=preview_final,
             model=args.model,
             auto_approve=args.auto_approve,
-            prompt=compose_prompt(task, 1, "<promise>COMPLETE</promise>"),
+            prompt=compose_prompt(work_item, 1, "<promise>COMPLETE</promise>"),
         )
         print("Command:")
         display_command = command if adapter.uses_stdin else [*command[:-1], "<PROMPT>"]
         print(shlex.join(display_command))
         print("\nPrompt:\n")
-        print(compose_prompt(task, 1, "<promise>COMPLETE</promise>"))
+        print(compose_prompt(work_item, 1, "<promise>COMPLETE</promise>"))
         return 0
 
     result = run_loop(
         LoopConfig(
             root=root,
-            task=task,
+            work_item=work_item,
             adapter=adapter,
             executable=resolved,
             max_iterations=args.max_iterations,
@@ -77,7 +90,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     if result.completed:
-        print(f"\nRALPH completed after {result.iterations} iteration(s). Logs: {result.run_dir}")
+        print(
+            f"\nRALPH completed after {result.iterations} iteration(s). Logs: {result.run_dir}"
+        )
         return 0
     if result.failed:
         return 1
@@ -87,4 +102,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

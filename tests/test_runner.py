@@ -4,15 +4,27 @@ from unittest import TestCase
 
 from ralph_loop.agents import OpenCodeAdapter
 from ralph_loop.runner import LoopConfig, has_completion_marker, run_loop
+from ralph_loop.work_items import WorkItem
+
+WORK_ITEM = WorkItem(
+    title="Build the thing",
+    description="Build the requested thing.",
+    definition_of_done=("Tests pass.",),
+    acceptance_criteria=("The thing works.",),
+)
 
 
 class CompletionMarkerTests(TestCase):
     def test_marker_must_occupy_a_line(self) -> None:
         self.assertTrue(has_completion_marker("Done\n<promise>COMPLETE</promise>\n"))
-        self.assertFalse(has_completion_marker("Use <promise>COMPLETE</promise> when done"))
+        self.assertFalse(
+            has_completion_marker("Use <promise>COMPLETE</promise> when done")
+        )
 
     def test_ansi_formatting_is_ignored(self) -> None:
-        self.assertTrue(has_completion_marker("\x1b[32m<promise>COMPLETE</promise>\x1b[0m"))
+        self.assertTrue(
+            has_completion_marker("\x1b[32m<promise>COMPLETE</promise>\x1b[0m")
+        )
 
 
 class LoopTests(TestCase):
@@ -29,14 +41,16 @@ class LoopTests(TestCase):
                 self.assertEqual(cwd, root)
                 self.assertIsNone(prompt)
                 self.assertIn(f"iteration {calls}", command[-1])
-                output = "still working\n" if calls == 1 else "<promise>COMPLETE</promise>\n"
+                output = (
+                    "still working\n" if calls == 1 else "<promise>COMPLETE</promise>\n"
+                )
                 log.write_text(output, encoding="utf-8")
                 return 0
 
             result = run_loop(
                 LoopConfig(
                     root=root,
-                    task="# Build the thing",
+                    work_item=WORK_ITEM,
                     adapter=OpenCodeAdapter(),
                     executable="opencode",
                     max_iterations=3,
@@ -62,7 +76,7 @@ class LoopTests(TestCase):
             result = run_loop(
                 LoopConfig(
                     root=root,
-                    task="task",
+                    work_item=WORK_ITEM,
                     adapter=OpenCodeAdapter(),
                     executable="opencode",
                     max_iterations=3,
@@ -72,4 +86,3 @@ class LoopTests(TestCase):
 
             self.assertTrue(result.failed)
             self.assertEqual(result.iterations, 1)
-

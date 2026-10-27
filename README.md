@@ -13,9 +13,9 @@ promise. The repository—not chat history—is the shared memory.
 uv sync
 uv run python -m unittest discover -s tests -v
 
-# Edit PROMPT.md first, then choose an agent:
-uv run ralph --agent codex --prompt PROMPT.md --max-iterations 5
-uv run ralph --agent opencode --prompt PROMPT.md --max-iterations 5
+# Edit WORK_ITEM.toml first, then choose an agent:
+uv run ralph --agent codex --work-item WORK_ITEM.toml --max-iterations 5
+uv run ralph --agent opencode --work-item WORK_ITEM.toml --max-iterations 5
 ```
 
 Each iteration starts a new agent session. Runtime state is written beneath `.ralph/`:
@@ -44,21 +44,26 @@ configuration first.
 Use `--dry-run` to inspect the selected command and composed prompt without invoking an agent:
 
 ```bash
-uv run ralph --agent opencode --prompt PROMPT.md --dry-run
+uv run ralph --agent opencode --work-item WORK_ITEM.toml --dry-run
 ```
 
 Models are backend-specific and optional:
 
 ```bash
-uv run ralph --agent codex --model YOUR_CODEX_MODEL --prompt PROMPT.md
-uv run ralph --agent opencode --model provider/model --prompt PROMPT.md
+uv run ralph --agent codex --model YOUR_CODEX_MODEL --work-item WORK_ITEM.toml
+uv run ralph --agent opencode --model provider/model --work-item WORK_ITEM.toml
 ```
 
-## Writing a useful task
+## Writing a useful work item
 
-Put the goal, constraints, verification command, and objective acceptance criteria in `PROMPT.md`.
-Keep the task outcome-focused. The harness adds iteration instructions and the completion contract
-automatically. Do not put the completion marker in your own prompt.
+Describe the work in `WORK_ITEM.toml` using the required `title`, `description`,
+`definition_of_done`, and `acceptance_criteria` fields. Optional `constraints` and `verification`
+arrays provide implementation boundaries and useful commands. The harness validates the work item,
+renders it into a consistent prompt, and adds the iteration and completion contract automatically.
+
+Definition of done describes the quality bar shared by the whole item, such as passing tests and
+updated documentation. Acceptance criteria describe observable behavior specific to the requested
+change. Keep each criterion independently verifiable, and do not include the completion marker.
 
 Start with two or three iterations and inspect `.ralph/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
