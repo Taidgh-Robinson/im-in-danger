@@ -1,5 +1,8 @@
+import json
 from collections.abc import Sequence
+from contextlib import redirect_stdout
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -197,6 +200,73 @@ class LoopTests(TestCase):
             self.assertFalse(result.failed)
             self.assertEqual(result.iterations, 2)
 
+    def test_reports_agent_criteria_status(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def write_status(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                (root / ".ralph" / "status.json").write_text(
+                    json.dumps(
+                        {
+                            "DoD-1": {"met": True, "evidence": "Ran the tests."},
+                            "AC-1": {"met": False},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                log.write_text("still working\n", encoding="utf-8")
+                return 0
+
+            output = StringIO()
+            with redirect_stdout(output):
+                run_loop(
+                    LoopConfig(
+                        root=root,
+                        work_item=WORK_ITEM,
+                        adapter=OpenCodeAdapter(),
+                        executable="opencode",
+                        max_iterations=1,
+                    ),
+                    invoke=write_status,
+                )
+
+            self.assertIn("[x] DoD-1: Tests pass.", output.getvalue())
+            self.assertIn("Ran the tests.", output.getvalue())
+            self.assertIn("[ ] AC-1: The thing works.", output.getvalue())
+            self.assertNotIn("not updated this iteration", output.getvalue())
+
+    def test_flags_status_that_was_not_updated(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".ralph").mkdir()
+            (root / ".ralph" / "status.json").write_text(
+                '{"AC-1": {"met": true}}', encoding="utf-8"
+            )
+
+            def idle(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                log.write_text("still working\n", encoding="utf-8")
+                return 0
+
+            output = StringIO()
+            with redirect_stdout(output):
+                run_loop(
+                    LoopConfig(
+                        root=root,
+                        work_item=WORK_ITEM,
+                        adapter=OpenCodeAdapter(),
+                        executable="opencode",
+                        max_iterations=1,
+                    ),
+                    invoke=idle,
+                )
+
+            self.assertIn("(not updated this iteration)", output.getvalue())
+            self.assertIn("[?] DoD-1: Tests pass.", output.getvalue())
+
 
 class ComposePromptTests(TestCase):
     def test_completion_requires_definition_of_done_and_acceptance(self) -> None:
@@ -218,3 +288,9 @@ class ComposePromptTests(TestCase):
         self.assertIn("This is iteration 5 of 5.", prompt)
         self.assertIn("This is the final iteration.", prompt)
         self.assertIn("Do not start large new pieces of work.", prompt)
+
+    def test_prompt_asks_for_status_keyed_by_id(self) -> None:
+        prompt = compose_prompt(WORK_ITEM, 1, MARKER, max_iterations=3)
+
+        self.assertIn("`.ralph/status.json`", prompt)
+        self.assertIn('"DoD-1": {"met": true', prompt)

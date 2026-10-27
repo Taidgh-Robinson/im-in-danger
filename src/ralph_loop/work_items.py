@@ -18,19 +18,39 @@ class WorkItem:
     constraints: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
 
+    def checklist(self) -> tuple[tuple[str, str], ...]:
+        """Return stable IDs for every definition of done item and acceptance criterion."""
+        return _numbered("DoD", self.definition_of_done) + _numbered(
+            "AC", self.acceptance_criteria
+        )
+
     def as_prompt(self) -> str:
         """Render the work item as an explicit agent-facing prompt."""
         sections = [
             f"# Work item: {self.title}",
             f"## Description\n\n{self.description}",
-            _render_list("Definition of done", self.definition_of_done),
-            _render_list("Acceptance criteria", self.acceptance_criteria),
+            _render_list(
+                "Definition of done",
+                tuple(_labelled(_numbered("DoD", self.definition_of_done))),
+            ),
+            _render_list(
+                "Acceptance criteria",
+                tuple(_labelled(_numbered("AC", self.acceptance_criteria))),
+            ),
         ]
         if self.constraints:
             sections.append(_render_list("Constraints", self.constraints))
         if self.verification:
             sections.append(_render_list("Verification", self.verification, code=True))
         return "\n\n".join(sections)
+
+
+def _numbered(prefix: str, values: tuple[str, ...]) -> tuple[tuple[str, str], ...]:
+    return tuple((f"{prefix}-{n}", value) for n, value in enumerate(values, start=1))
+
+
+def _labelled(items: tuple[tuple[str, str], ...]) -> list[str]:
+    return [f"{item_id}: {text}" for item_id, text in items]
 
 
 def _render_list(title: str, values: tuple[str, ...], *, code: bool = False) -> str:

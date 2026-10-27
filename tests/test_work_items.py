@@ -25,8 +25,10 @@ verification = ["python -m unittest"]
 
             self.assertEqual(work_item.title, "Add export")
             prompt = work_item.as_prompt()
-            self.assertIn("## Definition of done\n\n- Tests pass.", prompt)
-            self.assertIn("## Acceptance criteria", prompt)
+            self.assertIn("## Definition of done\n\n- DoD-1: Tests pass.", prompt)
+            self.assertIn(
+                "## Acceptance criteria\n\n- AC-1: The output is valid JSON.", prompt
+            )
             self.assertIn("- `python -m unittest`", prompt)
 
     def test_rejects_missing_required_fields(self) -> None:
@@ -85,3 +87,20 @@ verification = []
 
             self.assertEqual(work_item.constraints, ())
             self.assertEqual(work_item.verification, ())
+
+    def test_checklist_assigns_stable_ids(self) -> None:
+        work_item = WorkItem(
+            title="Small change",
+            description="Make the change.",
+            definition_of_done=("Tests pass.", "Docs updated."),
+            acceptance_criteria=("Behavior is observable.",),
+        )
+
+        self.assertEqual(
+            work_item.checklist(),
+            (
+                ("DoD-1", "Tests pass."),
+                ("DoD-2", "Docs updated."),
+                ("AC-1", "Behavior is observable."),
+            ),
+        )

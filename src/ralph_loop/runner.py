@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ralph_loop.agents import AgentAdapter
+from ralph_loop.status import STATUS_FILE, format_status, read_status
 from ralph_loop.verification import VerificationResult, run_verification
 from ralph_loop.work_items import WorkItem
 
@@ -79,6 +80,16 @@ be done.
 Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it if it exists. At
 the end of this iteration, update it with completed work, verification results, important
 decisions, and the clearest next step.
+
+Also write `.ralph/status.json` with your honest assessment of every definition of done item and
+acceptance criterion, keyed by the IDs shown above. Include every ID, for example:
+
+```json
+{{
+  "DoD-1": {{"met": true, "evidence": "What you ran or checked and what you saw."}},
+  "AC-1": {{"met": false, "evidence": "What is still missing."}}
+}}
+```
 {final_note}
 Only when every definition of done item and every acceptance criterion is genuinely satisfied,
 include this exact marker on a line by itself in your final response:
@@ -125,6 +136,27 @@ def _run_command(
         return process.wait()
 
 
+def _modified_ns(path: Path) -> int | None:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return None
+
+
+def _report_status(
+    path: Path, checklist: Sequence[tuple[str, str]], *, updated: bool
+) -> None:
+    """Print the agent's per-criterion assessment."""
+    print("\n--- Criteria status ---")
+    statuses = read_status(path, checklist)
+    if statuses is None:
+        print(f"No readable status in {path}.")
+        return
+    if not updated:
+        print("(not updated this iteration)")
+    print(format_status(statuses))
+
+
 def _report_verification(verification: VerificationResult) -> None:
     """Print a one-line status for each verification command."""
     print("\n--- Verification ---")
@@ -149,6 +181,7 @@ def run_loop(
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
     run_dir = state_dir / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
+    status = state_dir / STATUS_FILE
     progress = state_dir / "progress.md"
     if not progress.exists():
         progress.write_text(
@@ -179,6 +212,7 @@ def run_loop(
             f"\n=== RALPH iteration {iteration}/{config.max_iterations} ({config.adapter.name}) ==="
         )
         stdin_prompt = prompt if config.adapter.uses_stdin else None
+        status_before = _modified_ns(status)
         return_code = invoke(command, stdin_prompt, log, config.root)
         if return_code != 0:
             print(
@@ -192,6 +226,11 @@ def run_loop(
                 failed=True,
             )
 
+        _report_status(
+            status,
+            config.work_item.checklist(),
+            updated=_modified_ns(status) != status_before,
+        )
         output = config.adapter.completion_output(log=log, final_message=final_message)
         claimed = has_completion_marker(output, config.completion_marker)
         if config.work_item.verification:

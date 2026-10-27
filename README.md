@@ -21,6 +21,9 @@ uv run ralph --agent opencode --work-item WORK_ITEM.toml --max-iterations 5
 Each iteration starts a new agent session. Runtime state is written beneath `.ralph/`:
 
 - `.ralph/progress.md` is the agents' durable handoff note.
+- `.ralph/status.json` is the agent's met/unmet assessment of each checklist item, with evidence.
+  The harness prints it as a checklist after every iteration and flags it when the agent did not
+  update it. It is for visibility only and does not gate completion.
 - `.ralph/runs/<run-id>/iteration-N.log` contains the combined command output.
 - Codex also writes its final response to `iteration-N.final.txt`.
 
@@ -73,6 +76,8 @@ renders it into a consistent prompt, and adds the iteration and completion contr
 Definition of done describes the quality bar shared by the whole item, such as passing tests and
 updated documentation. Acceptance criteria describe observable behavior specific to the requested
 change. Keep each criterion independently verifiable, and do not include the completion marker.
+The prompt labels them `DoD-1`, `DoD-2`, … and `AC-1`, `AC-2`, … in file order, and the agent
+reports status against those IDs.
 
 Start with two or three iterations and inspect `.ralph/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
