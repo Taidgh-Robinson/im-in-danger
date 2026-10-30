@@ -1,4 +1,4 @@
-"""Command-line interface for the RALPH loop runner."""
+"""Command-line interface for Scissorhands."""
 
 from __future__ import annotations
 
@@ -7,16 +7,16 @@ import shlex
 import shutil
 from pathlib import Path
 
-from ralph_loop.agents import ADAPTERS, get_adapter
-from ralph_loop.contract import default_contract, load_contract
-from ralph_loop.runner import LoopConfig, compose_prompt, run_loop
-from ralph_loop.work_items import load_work_item
+from scissorhands.agents import ADAPTERS, get_adapter
+from scissorhands.contract import default_contract, load_contract
+from scissorhands.runner import LoopConfig, compose_prompt, run_loop
+from scissorhands.work_items import load_work_item
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ralph",
-        description="Run a bounded, fresh-session RALPH loop with Codex or OpenCode.",
+        prog="scissorhands",
+        description="Run a bounded, fresh-session agent loop with Codex or OpenCode.",
     )
     parser.add_argument("--agent", choices=sorted(ADAPTERS), default="codex")
     parser.add_argument(
@@ -76,7 +76,9 @@ def main(argv: list[str] | None = None) -> int:
             max_iterations=args.max_iterations,
             contract=contract,
         )
-        preview_final = root / ".ralph" / "runs" / "DRY-RUN" / "iteration-1.final.txt"
+        preview_final = (
+            root / ".scissorhands" / "runs" / "DRY-RUN" / "iteration-1.final.txt"
+        )
         command = adapter.command(
             executable=resolved,
             root=root,
@@ -106,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if result.completed:
         print(
-            f"\nRALPH completed after {result.iterations} iteration(s). Logs: {result.run_dir}"
+            f"\nScissorhands completed after {result.iterations} iteration(s). "
+            f"Logs: {result.run_dir}"
         )
         return 0
     if result.failed:

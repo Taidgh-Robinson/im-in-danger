@@ -4,7 +4,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from ralph_loop.verification import CommandResult, VerificationResult, run_verification
+from scissorhands.verification import (
+    CommandResult,
+    VerificationResult,
+    run_verification,
+)
 
 PYTHON = shlex.quote(sys.executable)
 

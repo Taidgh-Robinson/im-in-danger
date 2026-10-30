@@ -7,15 +7,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from ralph_loop.agents import OpenCodeAdapter
-from ralph_loop.runner import (
+from scissorhands.agents import OpenCodeAdapter
+from scissorhands.runner import (
     LoopConfig,
     compose_prompt,
     has_completion_marker,
     run_loop,
 )
-from ralph_loop.verification import CommandResult, VerificationResult
-from ralph_loop.work_items import WorkItem
+from scissorhands.verification import CommandResult, VerificationResult
+from scissorhands.work_items import WorkItem
 
 WORK_ITEM = WorkItem(
     title="Build the thing",
@@ -28,7 +28,7 @@ MARKER = "<promise>COMPLETE</promise>"
 
 
 def write_fully_met_status(root: Path, evidence: str = "Checked.") -> None:
-    (root / ".ralph" / "status.json").write_text(
+    (root / ".scissorhands" / "status.json").write_text(
         json.dumps(
             {
                 "DoD-1": {"met": True, "evidence": evidence},
@@ -87,7 +87,7 @@ class LoopTests(TestCase):
             self.assertTrue(result.completed)
             self.assertEqual(result.iterations, 2)
             self.assertEqual(calls, 2)
-            self.assertTrue((root / ".ralph" / "progress.md").exists())
+            self.assertTrue((root / ".scissorhands" / "progress.md").exists())
             first_receipt = json.loads(
                 (result.run_dir / "iteration-1.json").read_text(encoding="utf-8")
             )
@@ -97,7 +97,7 @@ class LoopTests(TestCase):
             self.assertEqual(first_receipt["outcome"], "continuing")
             self.assertFalse(first_receipt["completion_marker_claimed"])
             self.assertFalse(first_receipt["progress_updated"])
-            self.assertIn("# RALPH progress", first_receipt["progress"])
+            self.assertIn("# Scissorhands progress", first_receipt["progress"])
             self.assertTrue(first_receipt["status_readable"])
             self.assertEqual(first_receipt["criteria"][0]["id"], "DoD-1")
             self.assertEqual(second_receipt["outcome"], "completed")
@@ -221,7 +221,7 @@ class LoopTests(TestCase):
     def test_marker_is_ignored_without_a_fresh_status(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / ".ralph").mkdir()
+            (root / ".scissorhands").mkdir()
             write_fully_met_status(root)
 
             def claim_without_update(
@@ -250,7 +250,7 @@ class LoopTests(TestCase):
             def claim_with_unmet_criterion(
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
-                (root / ".ralph" / "status.json").write_text(
+                (root / ".scissorhands" / "status.json").write_text(
                     json.dumps(
                         {
                             "DoD-1": {"met": True},
@@ -291,7 +291,7 @@ class LoopTests(TestCase):
                     status_root: Path = root,
                     status_entry: dict[str, object] = dod_entry,
                 ) -> int:
-                    (status_root / ".ralph" / "status.json").write_text(
+                    (status_root / ".scissorhands" / "status.json").write_text(
                         json.dumps(
                             {
                                 "DoD-1": status_entry,
@@ -355,7 +355,7 @@ class LoopTests(TestCase):
             def write_status(
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
-                (root / ".ralph" / "status.json").write_text(
+                (root / ".scissorhands" / "status.json").write_text(
                     json.dumps(
                         {
                             "DoD-1": {"met": True, "evidence": "Ran the tests."},
@@ -388,8 +388,8 @@ class LoopTests(TestCase):
     def test_flags_status_that_was_not_updated(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / ".ralph").mkdir()
-            (root / ".ralph" / "status.json").write_text(
+            (root / ".scissorhands").mkdir()
+            (root / ".scissorhands" / "status.json").write_text(
                 '{"AC-1": {"met": true}}', encoding="utf-8"
             )
 
@@ -440,5 +440,5 @@ class ComposePromptTests(TestCase):
     def test_prompt_asks_for_status_keyed_by_id(self) -> None:
         prompt = compose_prompt(WORK_ITEM, 1, MARKER, max_iterations=3)
 
-        self.assertIn("`.ralph/status.json`", prompt)
+        self.assertIn("`.scissorhands/status.json`", prompt)
         self.assertIn('"DoD-1": {"met": true', prompt)

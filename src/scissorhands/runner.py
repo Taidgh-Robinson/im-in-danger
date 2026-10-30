@@ -11,11 +11,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ralph_loop.agents import AgentAdapter
-from ralph_loop.contract import default_contract, render_contract
-from ralph_loop.status import STATUS_FILE, CriterionStatus, format_status, read_status
-from ralph_loop.verification import VerificationResult, run_verification
-from ralph_loop.work_items import WorkItem
+from scissorhands.agents import AgentAdapter
+from scissorhands.contract import default_contract, render_contract
+from scissorhands.status import STATUS_FILE, CriterionStatus, format_status, read_status
+from scissorhands.verification import VerificationResult, run_verification
+from scissorhands.work_items import WorkItem
 
 DEFAULT_COMPLETION_MARKER = "<promise>COMPLETE</promise>"
 _ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -60,8 +60,8 @@ def compose_prompt(
     if iteration == max_iterations:
         final_note = """
 This is the final iteration. Do not start large new pieces of work. Finish or safely wrap up what
-is in progress, leave the repository in a working state, and make `.ralph/progress.md` a clear
-handoff for whoever picks this up next.
+is in progress, leave the repository in a working state, and make
+`.scissorhands/progress.md` a clear handoff for whoever picks this up next.
 """
     feedback = ""
     if verification_feedback:
@@ -246,7 +246,7 @@ def run_loop(
     if config.max_iterations < 1:
         raise ValueError("max_iterations must be at least 1")
 
-    state_dir = config.root / ".ralph"
+    state_dir = config.root / ".scissorhands"
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
     run_dir = state_dir / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -254,7 +254,7 @@ def run_loop(
     progress = state_dir / "progress.md"
     if not progress.exists():
         progress.write_text(
-            "# RALPH progress\n\nNo iterations completed yet.\n", encoding="utf-8"
+            "# Scissorhands progress\n\nNo iterations completed yet.\n", encoding="utf-8"
         )
 
     feedback: str | None = None
@@ -279,7 +279,8 @@ def run_loop(
         )
 
         print(
-            f"\n=== RALPH iteration {iteration}/{config.max_iterations} ({config.adapter.name}) ==="
+            f"\n=== Scissorhands iteration {iteration}/{config.max_iterations} "
+            f"({config.adapter.name}) ==="
         )
         stdin_prompt = prompt if config.adapter.uses_stdin else None
         status_before = _modified_ns(status)

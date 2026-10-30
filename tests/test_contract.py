@@ -2,14 +2,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from ralph_loop.contract import (
+from scissorhands.contract import (
     default_contract,
     load_contract,
     render_contract,
     validate_contract,
 )
-from ralph_loop.runner import compose_prompt
-from ralph_loop.work_items import WorkItem
+from scissorhands.runner import compose_prompt
+from scissorhands.work_items import WorkItem
 
 WORK_ITEM = WorkItem(
     title="Build the thing",
@@ -59,5 +59,5 @@ class ContractTests(TestCase):
             )
 
         self.assertIn("## Custom\n\nRound 2/4. Say DONE.", prompt)
-        self.assertNotIn("RALPH iteration contract", prompt)
+        self.assertNotIn("Scissorhands iteration contract", prompt)
         self.assertTrue(prompt.startswith("# Work item: Build the thing"))

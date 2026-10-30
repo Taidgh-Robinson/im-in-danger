@@ -1,9 +1,9 @@
-# RALPH loop playground
+# Scissorhands
 
-A deliberately small Python harness for running bounded, fresh-context agent loops with either
+A deliberately small Python harness for running bounded, fresh-context coding-agent loops with either
 [Codex](https://developers.openai.com/codex/) or [OpenCode](https://opencode.ai/).
 
-Here, a **RALPH loop** means: give a coding agent the same goal repeatedly, let each fresh run
+Here, an **agent loop** means: give a coding agent the same goal repeatedly, let each fresh run
 inspect the work left by previous runs, and stop when the agent emits an explicit completion
 promise. The repository—not chat history—is the shared memory.
 
@@ -14,20 +14,20 @@ uv sync
 uv run python -m unittest discover -s tests -v
 
 # Edit WORK_ITEM.toml first, then choose an agent:
-uv run ralph --agent codex --work-item WORK_ITEM.toml --max-iterations 5
-uv run ralph --agent opencode --work-item WORK_ITEM.toml --max-iterations 5
+uv run scissorhands --agent codex --work-item WORK_ITEM.toml --max-iterations 5
+uv run scissorhands --agent opencode --work-item WORK_ITEM.toml --max-iterations 5
 ```
 
-Each iteration starts a new agent session. Runtime state is written beneath `.ralph/`:
+Each iteration starts a new agent session. Runtime state is written beneath `.scissorhands/`:
 
-- `.ralph/progress.md` is the agents' durable handoff note.
-- `.ralph/status.json` is the agent's met/unmet assessment of each checklist item, with evidence.
+- `.scissorhands/progress.md` is the agents' durable handoff note.
+- `.scissorhands/status.json` is the agent's met/unmet assessment of each checklist item, with evidence.
   The harness prints it as a checklist after every iteration. A completion marker is accepted only
   when the file was updated during that iteration and every definition-of-done and acceptance-
   criteria entry is present with `met` set to `true` and non-empty evidence.
-- `.ralph/runs/<run-id>/iteration-N.log` contains the combined command output.
+- `.scissorhands/runs/<run-id>/iteration-N.log` contains the combined command output.
 - Codex also writes its final response to `iteration-N.final.txt`.
-- `.ralph/runs/<run-id>/iteration-N.json` is the harness-owned receipt for that iteration. It
+- `.scissorhands/runs/<run-id>/iteration-N.json` is the harness-owned receipt for that iteration. It
   preserves the progress text and criteria snapshot, whether each was updated, verification
   results, the completion decision, and the iteration outcome.
 
@@ -60,14 +60,14 @@ configuration first.
 Use `--dry-run` to inspect the selected command and composed prompt without invoking an agent:
 
 ```bash
-uv run ralph --agent opencode --work-item WORK_ITEM.toml --dry-run
+uv run scissorhands --agent opencode --work-item WORK_ITEM.toml --dry-run
 ```
 
 Models are backend-specific and optional:
 
 ```bash
-uv run ralph --agent codex --model YOUR_CODEX_MODEL --work-item WORK_ITEM.toml
-uv run ralph --agent opencode --model provider/model --work-item WORK_ITEM.toml
+uv run scissorhands --agent codex --model YOUR_CODEX_MODEL --work-item WORK_ITEM.toml
+uv run scissorhands --agent opencode --model provider/model --work-item WORK_ITEM.toml
 ```
 
 ## Writing a useful work item
@@ -94,11 +94,11 @@ reports status against those IDs.
 ## Customizing the iteration contract
 
 The harness appends an iteration contract to every prompt. The default lives in
-`src/ralph_loop/contract.md`. To try different wording without editing code, copy that file,
+`src/scissorhands/contract.md`. To try different wording without editing code, copy that file,
 change it, and pass it with `--contract`:
 
 ```bash
-uv run ralph --agent codex --work-item WORK_ITEM.toml --contract my-contract.md --dry-run
+uv run scissorhands --agent codex --work-item WORK_ITEM.toml --contract my-contract.md --dry-run
 ```
 
 The template uses Python `string.Template` placeholders:
@@ -111,6 +111,6 @@ The template uses Python `string.Template` placeholders:
 
 Unknown placeholders are rejected at startup. Write a literal `$` as `$$`.
 
-Start with two or three iterations and inspect `.ralph/progress.md`, the run logs, and the Git diff.
+Start with two or three iterations and inspect `.scissorhands/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
 

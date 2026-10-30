@@ -1,16 +1,16 @@
 $verification_feedback
-## RALPH iteration contract
+## Scissorhands iteration contract
 
 This is iteration $iteration of $max_iterations. Work on the task now: inspect the repository,
 make the most useful next changes, and run relevant verification. Do not merely describe what could
 be done.
 
-Use `.ralph/progress.md` as durable memory between fresh agent sessions. Read it if it exists. At
-the end of this iteration, update it with completed work, verification results, important
-decisions, and the clearest next step.
+Use `.scissorhands/progress.md` as durable memory between fresh agent sessions. Read it if it
+exists. At the end of this iteration, update it with completed work, verification results,
+important decisions, and the clearest next step.
 
-Also write `.ralph/status.json` with your honest assessment of every definition of done item and
-acceptance criterion, keyed by the IDs shown above. Include every ID, for example:
+Also write `.scissorhands/status.json` with your honest assessment of every definition of done
+item and acceptance criterion, keyed by the IDs shown above. Include every ID, for example:
 
 ```json
 {

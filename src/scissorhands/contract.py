@@ -21,7 +21,7 @@ PLACEHOLDERS = frozenset(
 @cache
 def default_contract() -> str:
     """Return the packaged default contract template."""
-    return files("ralph_loop").joinpath("contract.md").read_text(encoding="utf-8")
+    return files("scissorhands").joinpath("contract.md").read_text(encoding="utf-8")
 
 
 def validate_contract(text: str, source: Path | str) -> None:
