@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from ralph_loop.agents import CodexAdapter, OpenCodeAdapter
+from scissorhands.agents import CodexAdapter, OpenCodeAdapter
 
 
 class AgentAdapterTests(TestCase):

@@ -9,7 +9,7 @@ from pathlib import Path
 
 @dataclass(frozen=True, slots=True)
 class WorkItem:
-    """A Jira-style unit of work for a RALPH loop."""
+    """A Jira-style unit of work for a Scissorhands loop."""
 
     title: str
     description: str
