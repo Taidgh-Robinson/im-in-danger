@@ -94,7 +94,7 @@ reports status against those IDs.
 ## Customizing the iteration contract
 
 The harness appends an iteration contract to every prompt. The default lives in
-`src/scissorhands/contract.md`. To try different wording without editing code, copy that file,
+`src/scissorhands/prompting/contract.md`. To try different wording without editing code, copy that file,
 change it, and pass it with `--contract`:
 
 ```bash
@@ -113,4 +113,19 @@ Unknown placeholders are rejected at startup. Write a literal `$` as `$$`.
 
 Start with two or three iterations and inspect `.scissorhands/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
+
+## Project layout
+
+```text
+src/scissorhands/
+  cli.py              Command-line entry point
+  agents.py           Agent-specific commands and output handling
+  core/               Loop orchestration, execution, decisions, receipts, and reporting
+  prompting/          Prompt composition, contract rendering, and default template
+tests/                Unit tests
+docs/planning/        Roadmaps and design drafts
+WORK_ITEM.toml        Editable work item used by the default CLI command
+```
+
+Planning documents are design drafts and may describe earlier names or proposed features.
 

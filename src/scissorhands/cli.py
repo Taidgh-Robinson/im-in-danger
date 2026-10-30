@@ -8,9 +8,10 @@ import shutil
 from pathlib import Path
 
 from scissorhands.agents import ADAPTERS, get_adapter
-from scissorhands.contract import default_contract, load_contract
-from scissorhands.runner import LoopConfig, compose_prompt, run_loop
-from scissorhands.work_items import load_work_item
+from scissorhands.core.runner import DEFAULT_COMPLETION_MARKER, LoopConfig, run_loop
+from scissorhands.core.work_items import load_work_item
+from scissorhands.prompting.compose import compose_prompt
+from scissorhands.prompting.contract import default_contract, load_contract
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         prompt = compose_prompt(
             work_item,
             1,
-            "<promise>COMPLETE</promise>",
+            DEFAULT_COMPLETION_MARKER,
             max_iterations=args.max_iterations,
             contract=contract,
         )

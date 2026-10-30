@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from scissorhands.work_items import WorkItem, load_work_item
+from scissorhands.core.work_items import WorkItem, load_work_item
 
 
 class WorkItemTests(TestCase):

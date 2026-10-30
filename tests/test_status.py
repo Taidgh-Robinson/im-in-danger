@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from scissorhands.status import CriterionStatus, format_status, read_status
+from scissorhands.core.status import CriterionStatus, format_status, read_status
 
 CHECKLIST = (("DoD-1", "Tests pass."), ("AC-1", "It works."))
 

@@ -8,14 +8,14 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from scissorhands.agents import OpenCodeAdapter
-from scissorhands.runner import (
+from scissorhands.core.runner import (
     LoopConfig,
-    compose_prompt,
     has_completion_marker,
     run_loop,
 )
-from scissorhands.verification import CommandResult, VerificationResult
-from scissorhands.work_items import WorkItem
+from scissorhands.core.verification import CommandResult, VerificationResult
+from scissorhands.core.work_items import WorkItem
+from scissorhands.prompting.compose import compose_prompt
 
 WORK_ITEM = WorkItem(
     title="Build the thing",

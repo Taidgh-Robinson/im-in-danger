@@ -13,6 +13,9 @@ This repository contains Scissorhands, a small Python harness for experimenting 
 - Keep the core dependency-free unless a dependency clearly earns its place.
 - Use absolute imports instead of relative imports.
 - Keep agent-specific CLI behavior inside `src/scissorhands/agents.py`.
+- Keep loop execution and work-item state in `src/scissorhands/core/`.
+- Keep contract templates and rendering in `src/scissorhands/prompting/`.
+- Keep roadmap and design drafts in `docs/planning/`.
 - Add or update tests for behavioral changes.
 - Do not weaken sandboxing or enable automatic approvals by default.
 
