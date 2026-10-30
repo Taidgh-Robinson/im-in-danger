@@ -27,6 +27,18 @@ VERIFIED_WORK_ITEM = replace(WORK_ITEM, verification=("make test",))
 MARKER = "<promise>COMPLETE</promise>"
 
 
+def write_fully_met_status(root: Path, evidence: str = "Checked.") -> None:
+    (root / ".ralph" / "status.json").write_text(
+        json.dumps(
+            {
+                "DoD-1": {"met": True, "evidence": evidence},
+                "AC-1": {"met": True, "evidence": evidence},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class CompletionMarkerTests(TestCase):
     def test_marker_must_occupy_a_line(self) -> None:
         self.assertTrue(has_completion_marker("Done\n<promise>COMPLETE</promise>\n"))
@@ -57,6 +69,7 @@ class LoopTests(TestCase):
                 output = (
                     "still working\n" if calls == 1 else "<promise>COMPLETE</promise>\n"
                 )
+                write_fully_met_status(root, evidence=f"Checked in iteration {calls}.")
                 log.write_text(output, encoding="utf-8")
                 return 0
 
@@ -107,6 +120,7 @@ class LoopTests(TestCase):
             def complete(
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
+                write_fully_met_status(root)
                 log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
                 return 0
 
@@ -140,6 +154,9 @@ class LoopTests(TestCase):
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
                 prompts.append(command[-1])
+                write_fully_met_status(
+                    root, evidence=f"Checked before verification {len(prompts)}."
+                )
                 log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
                 return 0
 
@@ -170,6 +187,63 @@ class LoopTests(TestCase):
             self.assertNotIn("## Verification feedback", prompts[0])
             self.assertIn("## Verification feedback", prompts[1])
             self.assertIn("FAILED test_thing", prompts[1])
+
+    def test_marker_is_ignored_without_a_fresh_status(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".ralph").mkdir()
+            write_fully_met_status(root)
+
+            def claim_without_update(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
+                return 0
+
+            result = run_loop(
+                LoopConfig(
+                    root=root,
+                    work_item=WORK_ITEM,
+                    adapter=OpenCodeAdapter(),
+                    executable="opencode",
+                    max_iterations=1,
+                ),
+                invoke=claim_without_update,
+            )
+
+            self.assertFalse(result.completed)
+
+    def test_marker_is_ignored_until_every_criterion_is_met(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def claim_with_unmet_criterion(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                (root / ".ralph" / "status.json").write_text(
+                    json.dumps(
+                        {
+                            "DoD-1": {"met": True},
+                            "AC-1": {"met": False},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
+                return 0
+
+            result = run_loop(
+                LoopConfig(
+                    root=root,
+                    work_item=WORK_ITEM,
+                    adapter=OpenCodeAdapter(),
+                    executable="opencode",
+                    max_iterations=1,
+                ),
+                invoke=claim_with_unmet_criterion,
+            )
+
+            self.assertFalse(result.completed)
 
     def test_failing_verification_exhausts_the_iteration_limit(self) -> None:
         with TemporaryDirectory() as directory:

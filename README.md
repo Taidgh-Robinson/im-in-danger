@@ -22,14 +22,15 @@ Each iteration starts a new agent session. Runtime state is written beneath `.ra
 
 - `.ralph/progress.md` is the agents' durable handoff note.
 - `.ralph/status.json` is the agent's met/unmet assessment of each checklist item, with evidence.
-  The harness prints it as a checklist after every iteration and flags it when the agent did not
-  update it. It is for visibility only and does not gate completion.
+  The harness prints it as a checklist after every iteration. A completion marker is accepted only
+  when the file was updated during that iteration and every definition-of-done and acceptance-
+  criteria entry is present with `met` set to `true`.
 - `.ralph/runs/<run-id>/iteration-N.log` contains the combined command output.
 - Codex also writes its final response to `iteration-N.final.txt`.
 
-The loop stops when the agent puts `<promise>COMPLETE</promise>` on a line by itself, when an
-agent command fails, or when the iteration limit is reached. Reaching the limit returns exit code
-2; an agent failure returns 1.
+The loop stops when the agent puts `<promise>COMPLETE</promise>` on a line by itself and submits a
+fresh, fully-met criteria status, when an agent command fails, or when the iteration limit is
+reached. Reaching the limit returns exit code 2; an agent failure returns 1.
 
 If the work item lists `verification` commands, the harness runs them itself after every iteration
 instead of trusting the agent's report. The completion marker is only accepted when every command

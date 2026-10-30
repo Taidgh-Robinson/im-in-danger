@@ -18,6 +18,10 @@ acceptance criterion, keyed by the IDs shown above. Include every ID, for exampl
   "AC-1": {"met": false, "evidence": "What is still missing."}
 }
 ```
+
+The harness only accepts the completion marker when this file was updated during the current
+iteration and every listed item has `"met": true`.
+
 $final_iteration_note
 Only when every definition of done item and every acceptance criterion is genuinely satisfied,
 include this exact marker on a line by itself in your final response:

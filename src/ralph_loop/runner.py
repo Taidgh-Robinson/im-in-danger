@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ralph_loop.agents import AgentAdapter
 from ralph_loop.contract import default_contract, render_contract
-from ralph_loop.status import STATUS_FILE, format_status, read_status
+from ralph_loop.status import STATUS_FILE, CriterionStatus, format_status, read_status
 from ralph_loop.verification import VerificationResult, run_verification
 from ralph_loop.work_items import WorkItem
 
@@ -126,16 +126,17 @@ def _modified_ns(path: Path) -> int | None:
 
 def _report_status(
     path: Path, checklist: Sequence[tuple[str, str]], *, updated: bool
-) -> None:
+) -> tuple[CriterionStatus, ...] | None:
     """Print the agent's per-criterion assessment."""
     print("\n--- Criteria status ---")
     statuses = read_status(path, checklist)
     if statuses is None:
         print(f"No readable status in {path}.")
-        return
+        return None
     if not updated:
         print("(not updated this iteration)")
     print(format_status(statuses))
+    return statuses
 
 
 def _report_verification(verification: VerificationResult) -> None:
@@ -208,10 +209,16 @@ def run_loop(
                 failed=True,
             )
 
-        _report_status(
+        status_updated = _modified_ns(status) != status_before
+        statuses = _report_status(
             status,
             config.work_item.checklist(),
-            updated=_modified_ns(status) != status_before,
+            updated=status_updated,
+        )
+        criteria_met = (
+            status_updated
+            and statuses is not None
+            and all(item.met is True for item in statuses)
         )
         output = config.adapter.completion_output(log=log, final_message=final_message)
         claimed = has_completion_marker(output, config.completion_marker)
@@ -228,6 +235,13 @@ def run_loop(
                 continue
             feedback = None
         if claimed:
+            if not criteria_met:
+                print(
+                    "Ignoring the completion marker because criteria status was not "
+                    "updated this iteration with every item met.",
+                    file=sys.stderr,
+                )
+                continue
             return LoopResult(completed=True, iterations=iteration, run_dir=run_dir)
 
     return LoopResult(
