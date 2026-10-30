@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from ralph_loop.agents import AgentAdapter
 from ralph_loop.contract import default_contract, render_contract
-from ralph_loop.status import STATUS_FILE, format_status, read_status
+from ralph_loop.status import STATUS_FILE, CriterionStatus, format_status, read_status
 from ralph_loop.verification import VerificationResult, run_verification
 from ralph_loop.work_items import WorkItem
 
@@ -124,18 +125,105 @@ def _modified_ns(path: Path) -> int | None:
         return None
 
 
+def _read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
 def _report_status(
     path: Path, checklist: Sequence[tuple[str, str]], *, updated: bool
-) -> None:
+) -> tuple[CriterionStatus, ...] | None:
     """Print the agent's per-criterion assessment."""
     print("\n--- Criteria status ---")
     statuses = read_status(path, checklist)
     if statuses is None:
         print(f"No readable status in {path}.")
-        return
+        return None
     if not updated:
         print("(not updated this iteration)")
     print(format_status(statuses))
+    return statuses
+
+
+def _criteria_status_problem(
+    statuses: Sequence[CriterionStatus] | None, *, updated: bool
+) -> str | None:
+    """Explain why criteria status cannot support a completion claim."""
+    if not updated:
+        return "criteria status was not updated this iteration"
+    if statuses is None:
+        return "criteria status was not readable"
+
+    unmet = [item.id for item in statuses if item.met is not True]
+    if unmet:
+        return f"not every criterion was met: {', '.join(unmet)}"
+
+    missing_evidence = [item.id for item in statuses if not item.evidence]
+    if missing_evidence:
+        return f"criteria are missing evidence: {', '.join(missing_evidence)}"
+    return None
+
+
+def _write_iteration_receipt(
+    path: Path,
+    *,
+    iteration: int,
+    agent: str,
+    agent_exit_code: int,
+    statuses: Sequence[CriterionStatus] | None,
+    status_updated: bool,
+    progress: str | None,
+    progress_updated: bool,
+    verification: VerificationResult | None,
+    verification_required: bool,
+    marker_claimed: bool,
+    completion_accepted: bool,
+    outcome: str,
+) -> None:
+    """Write a harness-owned, immutable summary of one iteration."""
+    criteria = []
+    if statuses is not None:
+        criteria = [
+            {
+                "id": item.id,
+                "text": item.text,
+                "met": item.met,
+                "evidence": item.evidence,
+            }
+            for item in statuses
+        ]
+    verification_results = []
+    if verification is not None:
+        verification_results = [
+            {
+                "command": result.command,
+                "return_code": result.return_code,
+                "passed": result.passed,
+            }
+            for result in verification.results
+        ]
+    receipt = {
+        "recorded_at": datetime.now(UTC).isoformat(),
+        "iteration": iteration,
+        "agent": agent,
+        "agent_exit_code": agent_exit_code,
+        "outcome": outcome,
+        "progress_updated": progress_updated,
+        "progress": progress,
+        "status_updated": status_updated,
+        "status_readable": statuses is not None,
+        "criteria": criteria,
+        "verification": {
+            "required": verification_required,
+            "passed": verification.passed if verification is not None else None,
+            "commands": verification_results,
+        },
+        "completion_marker_claimed": marker_claimed,
+        "completion_accepted": completion_accepted,
+    }
+    path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 
 
 def _report_verification(verification: VerificationResult) -> None:
@@ -195,8 +283,26 @@ def run_loop(
         )
         stdin_prompt = prompt if config.adapter.uses_stdin else None
         status_before = _modified_ns(status)
+        progress_before = _modified_ns(progress)
         return_code = invoke(command, stdin_prompt, log, config.root)
+        status_updated = _modified_ns(status) != status_before
+        progress_updated = _modified_ns(progress) != progress_before
         if return_code != 0:
+            _write_iteration_receipt(
+                run_dir / f"iteration-{iteration}.json",
+                iteration=iteration,
+                agent=config.adapter.name,
+                agent_exit_code=return_code,
+                statuses=read_status(status, config.work_item.checklist()),
+                status_updated=status_updated,
+                progress=_read_text(progress),
+                progress_updated=progress_updated,
+                verification=None,
+                verification_required=bool(config.work_item.verification),
+                marker_claimed=False,
+                completion_accepted=False,
+                outcome="agent_failed",
+            )
             print(
                 f"Agent command failed with exit code {return_code}. Log: {log}",
                 file=sys.stderr,
@@ -208,13 +314,17 @@ def run_loop(
                 failed=True,
             )
 
-        _report_status(
+        statuses = _report_status(
             status,
             config.work_item.checklist(),
-            updated=_modified_ns(status) != status_before,
+            updated=status_updated,
+        )
+        criteria_problem = _criteria_status_problem(
+            statuses, updated=status_updated
         )
         output = config.adapter.completion_output(log=log, final_message=final_message)
         claimed = has_completion_marker(output, config.completion_marker)
+        verification: VerificationResult | None = None
         if config.work_item.verification:
             verification = verify(config.work_item.verification, config.root)
             _report_verification(verification)
@@ -225,9 +335,47 @@ def run_loop(
                         "Ignoring the completion marker because verification failed.",
                         file=sys.stderr,
                     )
-                continue
-            feedback = None
-        if claimed:
+            else:
+                feedback = None
+
+        verification_passed = verification is None or verification.passed
+        completion_accepted = claimed and verification_passed and criteria_problem is None
+        if not verification_passed:
+            outcome = "verification_failed"
+        elif claimed and criteria_problem is not None:
+            outcome = "criteria_rejected"
+        elif completion_accepted:
+            outcome = "completed"
+        elif iteration == config.max_iterations:
+            outcome = "iteration_limit"
+        else:
+            outcome = "continuing"
+
+        _write_iteration_receipt(
+            run_dir / f"iteration-{iteration}.json",
+            iteration=iteration,
+            agent=config.adapter.name,
+            agent_exit_code=return_code,
+            statuses=statuses,
+            status_updated=status_updated,
+            progress=_read_text(progress),
+            progress_updated=progress_updated,
+            verification=verification,
+            verification_required=bool(config.work_item.verification),
+            marker_claimed=claimed,
+            completion_accepted=completion_accepted,
+            outcome=outcome,
+        )
+
+        if not verification_passed:
+            continue
+        if claimed and criteria_problem is not None:
+            print(
+                f"Ignoring the completion marker because {criteria_problem}.",
+                file=sys.stderr,
+            )
+            continue
+        if completion_accepted:
             return LoopResult(completed=True, iterations=iteration, run_dir=run_dir)
 
     return LoopResult(

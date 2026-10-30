@@ -1,6 +1,6 @@
 import json
 from collections.abc import Sequence
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
@@ -25,6 +25,18 @@ WORK_ITEM = WorkItem(
 )
 VERIFIED_WORK_ITEM = replace(WORK_ITEM, verification=("make test",))
 MARKER = "<promise>COMPLETE</promise>"
+
+
+def write_fully_met_status(root: Path, evidence: str = "Checked.") -> None:
+    (root / ".ralph" / "status.json").write_text(
+        json.dumps(
+            {
+                "DoD-1": {"met": True, "evidence": evidence},
+                "AC-1": {"met": True, "evidence": evidence},
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class CompletionMarkerTests(TestCase):
@@ -57,6 +69,7 @@ class LoopTests(TestCase):
                 output = (
                     "still working\n" if calls == 1 else "<promise>COMPLETE</promise>\n"
                 )
+                write_fully_met_status(root, evidence=f"Checked in iteration {calls}.")
                 log.write_text(output, encoding="utf-8")
                 return 0
 
@@ -75,6 +88,20 @@ class LoopTests(TestCase):
             self.assertEqual(result.iterations, 2)
             self.assertEqual(calls, 2)
             self.assertTrue((root / ".ralph" / "progress.md").exists())
+            first_receipt = json.loads(
+                (result.run_dir / "iteration-1.json").read_text(encoding="utf-8")
+            )
+            second_receipt = json.loads(
+                (result.run_dir / "iteration-2.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(first_receipt["outcome"], "continuing")
+            self.assertFalse(first_receipt["completion_marker_claimed"])
+            self.assertFalse(first_receipt["progress_updated"])
+            self.assertIn("# RALPH progress", first_receipt["progress"])
+            self.assertTrue(first_receipt["status_readable"])
+            self.assertEqual(first_receipt["criteria"][0]["id"], "DoD-1")
+            self.assertEqual(second_receipt["outcome"], "completed")
+            self.assertTrue(second_receipt["completion_accepted"])
 
     def test_loop_stops_on_agent_failure(self) -> None:
         with TemporaryDirectory() as directory:
@@ -99,6 +126,11 @@ class LoopTests(TestCase):
 
             self.assertTrue(result.failed)
             self.assertEqual(result.iterations, 1)
+            receipt = json.loads(
+                (result.run_dir / "iteration-1.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(receipt["agent_exit_code"], 7)
+            self.assertEqual(receipt["outcome"], "agent_failed")
 
     def test_verification_is_skipped_without_commands(self) -> None:
         with TemporaryDirectory() as directory:
@@ -107,6 +139,7 @@ class LoopTests(TestCase):
             def complete(
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
+                write_fully_met_status(root)
                 log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
                 return 0
 
@@ -140,6 +173,9 @@ class LoopTests(TestCase):
                 command: list[str], prompt: str | None, log: Path, cwd: Path
             ) -> int:
                 prompts.append(command[-1])
+                write_fully_met_status(
+                    root, evidence=f"Checked before verification {len(prompts)}."
+                )
                 log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
                 return 0
 
@@ -170,6 +206,118 @@ class LoopTests(TestCase):
             self.assertNotIn("## Verification feedback", prompts[0])
             self.assertIn("## Verification feedback", prompts[1])
             self.assertIn("FAILED test_thing", prompts[1])
+            first_receipt = json.loads(
+                (result.run_dir / "iteration-1.json").read_text(encoding="utf-8")
+            )
+            second_receipt = json.loads(
+                (result.run_dir / "iteration-2.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(first_receipt["verification"]["passed"])
+            self.assertEqual(
+                first_receipt["verification"]["commands"][0]["return_code"], 1
+            )
+            self.assertTrue(second_receipt["verification"]["passed"])
+
+    def test_marker_is_ignored_without_a_fresh_status(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".ralph").mkdir()
+            write_fully_met_status(root)
+
+            def claim_without_update(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
+                return 0
+
+            result = run_loop(
+                LoopConfig(
+                    root=root,
+                    work_item=WORK_ITEM,
+                    adapter=OpenCodeAdapter(),
+                    executable="opencode",
+                    max_iterations=1,
+                ),
+                invoke=claim_without_update,
+            )
+
+            self.assertFalse(result.completed)
+
+    def test_marker_is_ignored_until_every_criterion_is_met(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def claim_with_unmet_criterion(
+                command: list[str], prompt: str | None, log: Path, cwd: Path
+            ) -> int:
+                (root / ".ralph" / "status.json").write_text(
+                    json.dumps(
+                        {
+                            "DoD-1": {"met": True},
+                            "AC-1": {"met": False},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
+                return 0
+
+            result = run_loop(
+                LoopConfig(
+                    root=root,
+                    work_item=WORK_ITEM,
+                    adapter=OpenCodeAdapter(),
+                    executable="opencode",
+                    max_iterations=1,
+                ),
+                invoke=claim_with_unmet_criterion,
+            )
+
+            self.assertFalse(result.completed)
+
+    def test_marker_is_ignored_when_evidence_is_missing_or_blank(self) -> None:
+        for label, dod_entry in (
+            ("missing", {"met": True}),
+            ("blank", {"met": True, "evidence": "  \n"}),
+        ):
+            with self.subTest(label=label), TemporaryDirectory() as directory:
+                root = Path(directory)
+
+                def claim_without_evidence(
+                    command: list[str],
+                    prompt: str | None,
+                    log: Path,
+                    cwd: Path,
+                    status_root: Path = root,
+                    status_entry: dict[str, object] = dod_entry,
+                ) -> int:
+                    (status_root / ".ralph" / "status.json").write_text(
+                        json.dumps(
+                            {
+                                "DoD-1": status_entry,
+                                "AC-1": {"met": True, "evidence": "Observed it."},
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    log.write_text("<promise>COMPLETE</promise>\n", encoding="utf-8")
+                    return 0
+
+                errors = StringIO()
+                with redirect_stderr(errors):
+                    result = run_loop(
+                        LoopConfig(
+                            root=root,
+                            work_item=WORK_ITEM,
+                            adapter=OpenCodeAdapter(),
+                            executable="opencode",
+                            max_iterations=1,
+                        ),
+                        invoke=claim_without_evidence,
+                    )
+
+                self.assertFalse(result.completed)
+                self.assertIn("missing evidence: DoD-1", errors.getvalue())
 
     def test_failing_verification_exhausts_the_iteration_limit(self) -> None:
         with TemporaryDirectory() as directory:
