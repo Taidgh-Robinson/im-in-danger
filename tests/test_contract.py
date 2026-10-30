@@ -2,14 +2,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from scissorhands.contract import (
+from scissorhands.core.work_items import WorkItem
+from scissorhands.prompting.compose import compose_prompt
+from scissorhands.prompting.contract import (
     default_contract,
     load_contract,
     render_contract,
     validate_contract,
 )
-from scissorhands.runner import compose_prompt
-from scissorhands.work_items import WorkItem
 
 WORK_ITEM = WorkItem(
     title="Build the thing",
