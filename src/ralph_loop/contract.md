@@ -20,7 +20,7 @@ acceptance criterion, keyed by the IDs shown above. Include every ID, for exampl
 ```
 
 The harness only accepts the completion marker when this file was updated during the current
-iteration and every listed item has `"met": true`.
+iteration and every listed item has `"met": true` with non-empty `"evidence"`.
 
 $final_iteration_note
 Only when every definition of done item and every acceptance criterion is genuinely satisfied,
