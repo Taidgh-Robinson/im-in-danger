@@ -1,0 +1,34 @@
+title = "Replace this example with a small, verifiable change"
+
+description = """
+Describe the work to be done, why it is needed, and any context the agent needs to make good
+implementation decisions.
+"""
+
+relevant_paths = [
+  "src/",
+]
+
+definition_of_done = [
+  "The implementation is complete rather than a partial scaffold.",
+  "Relevant automated tests pass.",
+  "User-facing behavior is documented.",
+]
+
+acceptance_criteria = [
+  "State the first observable behavior that must be true.",
+  "State another independently verifiable outcome.",
+]
+
+constraints = [
+  "Keep changes focused on this repository.",
+  "Prefer the simplest maintainable implementation.",
+]
+
+non_goals = [
+  "Name nearby work the agent should leave alone.",
+]
+
+verification = [
+  "uv run python -m unittest discover -s tests -v",
+]

@@ -13,20 +13,28 @@ promise. The repository—not chat history—is the shared memory.
 uv sync
 uv run python -m unittest discover -s tests -v
 
-# Edit PROMPT.md first, then choose an agent:
-uv run ralph --agent codex --prompt PROMPT.md --max-iterations 5
-uv run ralph --agent opencode --prompt PROMPT.md --max-iterations 5
+# Edit WORK_ITEM.toml first, then choose an agent:
+uv run ralph --agent codex --work-item WORK_ITEM.toml --max-iterations 5
+uv run ralph --agent opencode --work-item WORK_ITEM.toml --max-iterations 5
 ```
 
 Each iteration starts a new agent session. Runtime state is written beneath `.ralph/`:
 
 - `.ralph/progress.md` is the agents' durable handoff note.
+- `.ralph/status.json` is the agent's met/unmet assessment of each checklist item, with evidence.
+  The harness prints it as a checklist after every iteration and flags it when the agent did not
+  update it. It is for visibility only and does not gate completion.
 - `.ralph/runs/<run-id>/iteration-N.log` contains the combined command output.
 - Codex also writes its final response to `iteration-N.final.txt`.
 
 The loop stops when the agent puts `<promise>COMPLETE</promise>` on a line by itself, when an
 agent command fails, or when the iteration limit is reached. Reaching the limit returns exit code
 2; an agent failure returns 1.
+
+If the work item lists `verification` commands, the harness runs them itself after every iteration
+instead of trusting the agent's report. The completion marker is only accepted when every command
+exits 0. When a command fails, the tail of its output is added to the next iteration's prompt so
+the fresh session starts from the real failure.
 
 ## Safety model
 
@@ -36,6 +44,10 @@ The defaults are intentionally conservative:
 - OpenCode uses its configured permission policy.
 - Neither backend receives an automatic-approval flag unless you pass `--auto-approve`.
 - Every run must have a positive `--max-iterations` value.
+- `verification` commands run through your shell in the repository root, outside the agent's
+  sandbox, because they come from your work item. They are read once at startup, so an agent
+  editing `WORK_ITEM.toml` mid-run cannot change what the harness executes. They do run code the
+  agent wrote (your tests), just as running the tests yourself would.
 
 `--auto-approve` maps to `codex exec --approve-for-me` and `opencode run --auto`. OpenCode labels
 its flag dangerous, so use it only inside a repository you trust and review your agent/tool
@@ -44,21 +56,56 @@ configuration first.
 Use `--dry-run` to inspect the selected command and composed prompt without invoking an agent:
 
 ```bash
-uv run ralph --agent opencode --prompt PROMPT.md --dry-run
+uv run ralph --agent opencode --work-item WORK_ITEM.toml --dry-run
 ```
 
 Models are backend-specific and optional:
 
 ```bash
-uv run ralph --agent codex --model YOUR_CODEX_MODEL --prompt PROMPT.md
-uv run ralph --agent opencode --model provider/model --prompt PROMPT.md
+uv run ralph --agent codex --model YOUR_CODEX_MODEL --work-item WORK_ITEM.toml
+uv run ralph --agent opencode --model provider/model --work-item WORK_ITEM.toml
 ```
 
-## Writing a useful task
+## Writing a useful work item
 
-Put the goal, constraints, verification command, and objective acceptance criteria in `PROMPT.md`.
-Keep the task outcome-focused. The harness adds iteration instructions and the completion contract
-automatically. Do not put the completion marker in your own prompt.
+Describe the work in `WORK_ITEM.toml` using the required `title`, `description`,
+`definition_of_done`, and `acceptance_criteria` fields. These optional arrays shape the work
+further:
+
+- `relevant_paths`: files and directories to start from, so each fresh session spends less time
+  exploring.
+- `constraints`: implementation boundaries.
+- `non_goals`: nearby work the agent should leave alone.
+- `verification`: commands the harness runs after every iteration.
+
+The harness validates the work item, renders it into a consistent prompt, and adds the iteration
+and completion contract automatically.
+
+Definition of done describes the quality bar shared by the whole item, such as passing tests and
+updated documentation. Acceptance criteria describe observable behavior specific to the requested
+change. Keep each criterion independently verifiable, and do not include the completion marker.
+The prompt labels them `DoD-1`, `DoD-2`, … and `AC-1`, `AC-2`, … in file order, and the agent
+reports status against those IDs.
+
+## Customizing the iteration contract
+
+The harness appends an iteration contract to every prompt. The default lives in
+`src/ralph_loop/contract.md`. To try different wording without editing code, copy that file,
+change it, and pass it with `--contract`:
+
+```bash
+uv run ralph --agent codex --work-item WORK_ITEM.toml --contract my-contract.md --dry-run
+```
+
+The template uses Python `string.Template` placeholders:
+
+- `$marker` (required): the completion marker the harness looks for.
+- `$iteration` and `$max_iterations`: the current iteration and the limit.
+- `$final_iteration_note`: the wrap-up instructions on the last iteration, empty otherwise.
+- `$verification_feedback`: failing verification output from the previous iteration, empty
+  otherwise.
+
+Unknown placeholders are rejected at startup. Write a literal `$` as `$$`.
 
 Start with two or three iterations and inspect `.ralph/progress.md`, the run logs, and the Git diff.
 Small limits make it much easier to learn how prompt wording affects convergence.
